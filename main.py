@@ -10,11 +10,24 @@ import threading
 TRIGGER_KEY = 'x'
 DOUBLE_PRESS_THRESHOLD = 0.25  # seconds (fast double tap)
 def load_snippets():
+    items = []
     try:
         with open("snippets.txt", "r", encoding="utf-8") as f:
-            return [line.strip().replace('\\n', '\n') for line in f if line.strip()]
+            for line in f:
+                if not line.strip():
+                    continue
+                parts = line.strip().split('|', 1)
+                if len(parts) == 2:
+                    label, value = parts
+                else:
+                    label = value = parts[0]
+                
+                # Handle newlines in value
+                value = value.replace('\\n', '\n')
+                items.append({'label': label, 'value': value})
+            return items
     except FileNotFoundError:
-        return ["Error: snippets.txt not found"]
+        return [{'label': "Error: snippets.txt not found", 'value': ""}]
 
 TEXT_ITEMS = load_snippets()
 
@@ -27,6 +40,7 @@ class ModernPopup(tk.Tk):
         self.overrideredirect(True)  # Remove window decorations
         self.attributes('-topmost', True)  # Keep on top
         self.configure(bg='#1e1e1e')
+        self.wm_attributes('-transparentcolor', '#1e1e1e') # Make background transparent
         
         # Dimensions and positioning (will be set on show)
         self.width = 300
@@ -40,7 +54,7 @@ class ModernPopup(tk.Tk):
         self.text_color = "#ffffff"
         
         # Main container
-        self.container = tk.Frame(self, bg=self.bg_color, highlightthickness=1, highlightbackground="#444444")
+        self.container = tk.Frame(self, bg=self.bg_color, highlightthickness=0)
         self.container.pack(fill='both', expand=True)
         
         # Title (Optional)
@@ -55,25 +69,28 @@ class ModernPopup(tk.Tk):
         self.bind("<FocusOut>", lambda e: self.hide_window())
 
     def create_items(self):
-        for text in TEXT_ITEMS:
+        for item in TEXT_ITEMS:
+            text_label = item['label']
+            text_value = item['value']
+            
             # Container for the item to handle hover properly
             item_frame = tk.Frame(self.container, bg=self.bg_color)
-            item_frame.pack(fill='x', padx=1, pady=1)
+            item_frame.pack(fill='x', padx=1, pady=0)
             
             # Label for text (simulating button for better styling control)
             lbl = tk.Label(item_frame, 
-                           text=text, 
+                           text=text_label, 
                            bg=self.bg_color, 
                            fg=self.text_color, 
                            font=self.item_font, 
                            anchor="w", 
                            padx=10, 
-                           pady=8,
+                           pady=2,
                            cursor="hand2")
             lbl.pack(fill='x')
             
             # Events
-            lbl.bind("<Button-1>", lambda e, t=text: self.on_item_click(t))
+            lbl.bind("<Button-1>", lambda e, t=text_value: self.on_item_click(t))
             lbl.bind("<Enter>", lambda e, f=item_frame, l=lbl: self.on_hover(f, l, True))
             lbl.bind("<Leave>", lambda e, f=item_frame, l=lbl: self.on_hover(f, l, False))
 
@@ -98,7 +115,7 @@ class ModernPopup(tk.Tk):
         screen_height = self.winfo_screenheight()
         
         # Calculate height based on items (approx)
-        estimated_height = len(TEXT_ITEMS) * 40 + 20
+        estimated_height = len(TEXT_ITEMS) * 28 + 20
         
         if x + self.width > screen_width:
             x = screen_width - self.width - 10
